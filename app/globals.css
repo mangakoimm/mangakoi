@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #17130f;
+  color: #f4f0ee;
+}
+
+::-webkit-scrollbar {
+  height: 7px;
+}
+::-webkit-scrollbar-thumb {
+  background: #ffd8d8;
+  border-radius: 10px;
+}
