@@ -38,6 +38,7 @@ create table if not exists chapters (
   manga_id uuid references manga(id) on delete cascade,
   number numeric not null,
   title text,
+  coin_cost int not null default 0, -- 0 = free; >0 = coins required to unlock
   published_at timestamptz default now(),
   unique (manga_id, number)
 );
@@ -77,11 +78,57 @@ create table if not exists reading_history (
   primary key (user_id, manga_id)
 );
 
+-- ---------- Manga Coins ----------
+-- Wallet balance per user. In the shipped app this is currently simulated
+-- client-side with localStorage (lib/coinStore.tsx) since there's no auth
+-- wired up yet — these tables are here so a real backend can take over
+-- without changing the app's data shape.
+create table if not exists wallets (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  coin_balance int not null default 0,
+  total_purchased int not null default 0,
+  total_spent int not null default 0,
+  updated_at timestamptz default now()
+);
+
+create table if not exists coin_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
+  type text not null check (type in ('topup', 'unlock')),
+  amount int not null, -- positive for topup, negative for unlock
+  description text,
+  created_at timestamptz default now()
+);
+
+create table if not exists topup_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
+  package_coins int not null,
+  price_label text not null,
+  full_name text not null,
+  email text not null,
+  transaction_id text,
+  notes text,
+  screenshot_url text, -- upload to a "topup-screenshots" storage bucket, store the public URL here
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz default now(),
+  reviewed_at timestamptz
+);
+
+create table if not exists unlocked_chapters (
+  user_id uuid references profiles(id) on delete cascade,
+  chapter_id uuid references chapters(id) on delete cascade,
+  unlocked_at timestamptz default now(),
+  primary key (user_id, chapter_id)
+);
+
 -- ---------- Helpful indexes ----------
 create index if not exists idx_chapters_manga on chapters(manga_id);
 create index if not exists idx_pages_chapter on pages(chapter_id);
 create index if not exists idx_manga_status on manga(status);
 create index if not exists idx_manga_rating on manga(rating desc);
+create index if not exists idx_coin_tx_user on coin_transactions(user_id);
+create index if not exists idx_topup_status on topup_requests(status);
 
 -- ---------- Row Level Security ----------
 -- Public read access to catalog data; writes restricted to the service role (your admin scripts/API).
@@ -110,3 +157,23 @@ create policy "Users manage their own history" on reading_history
 
 create policy "Users manage their own profile" on profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Wallets, transactions, top-up requests, and unlocks are private to each
+-- signed-in user. Admins approving top-ups should use the service role key
+-- (bypasses RLS) from a trusted server context, not the anon client key.
+alter table wallets enable row level security;
+alter table coin_transactions enable row level security;
+alter table topup_requests enable row level security;
+alter table unlocked_chapters enable row level security;
+
+create policy "Users manage their own wallet" on wallets
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage their own transactions" on coin_transactions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage their own topup requests" on topup_requests
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage their own unlocks" on unlocked_chapters
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

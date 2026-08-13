@@ -1,8 +1,9 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getMangaBySlug, getChapters } from '@/lib/supabase';
 import { mockManga } from '@/lib/mockData';
+import { getChapterCost } from '@/lib/coinRules';
 import TrackHistory from '@/components/TrackHistory';
+import ChapterListItem from '@/components/ChapterListItem';
 
 export const revalidate = 60;
 
@@ -45,17 +46,15 @@ export default async function MangaPage({ params }: { params: Params }) {
       <p className="mb-8 text-ink-soft">{manga.description}</p>
 
       <h2 className="mb-4 font-display text-xl font-bold">Chapters</h2>
-      <div className="divide-y divide-black/5 rounded-lg border border-black/5 bg-white">
+      <div className="divide-y divide-black/5 rounded-lg border border-black/5 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-[#1f1a16]">
         {chapters.length === 0 && <p className="p-4 text-ink-soft">No chapters published yet.</p>}
         {chapters.map((c) => (
-          <Link
+          <ChapterListItem
             key={c.id}
-            href={`/reader/${manga.slug}/${c.number}`}
-            className="flex items-center justify-between px-5 py-3.5 text-sm font-medium hover:bg-blush-soft"
-          >
-            <span>Chapter {c.number}{c.title ? ` — ${c.title}` : ''}</span>
-            <span className="text-ink-soft">{new Date(c.published_at).toLocaleDateString()}</span>
-          </Link>
+            mangaSlug={manga!.slug}
+            chapter={c}
+            cost={getChapterCost(c.number, chapters.length)}
+          />
         ))}
       </div>
     </main>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import CoinBadge from './CoinBadge';
 
 const links = [
   { label: 'Home', href: '/' },
@@ -54,6 +55,7 @@ export default function Nav() {
           </ul>
 
           <div className="flex flex-shrink-0 items-center gap-2.5">
+            <CoinBadge className="hidden sm:flex" />
             <button
               onClick={toggleDark}
               aria-label="Toggle dark mode"
@@ -99,6 +101,13 @@ export default function Nav() {
               className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
             >
               Profile
+            </Link>
+            <Link
+              href="/topup"
+              onClick={() => setDrawerOpen(false)}
+              className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
+            >
+              🪙 Top Up
             </Link>
           </div>
         </div>

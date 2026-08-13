@@ -3,6 +3,8 @@ import { Poppins, Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
 import SiteChrome from '@/components/SiteChrome';
 import { ClientStoreProvider } from '@/lib/clientStore';
+import { CoinStoreProvider } from '@/lib/coinStore';
+import { ToastProvider } from '@/lib/toastStore';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -25,9 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${poppins.variable} ${noto.variable}`}>
       <body className="bg-paper text-ink font-body">
-        <ClientStoreProvider>
-          <SiteChrome>{children}</SiteChrome>
-        </ClientStoreProvider>
+        <ToastProvider>
+          <ClientStoreProvider>
+            <CoinStoreProvider>
+              <SiteChrome>{children}</SiteChrome>
+            </CoinStoreProvider>
+          </ClientStoreProvider>
+        </ToastProvider>
       </body>
     </html>
   );
