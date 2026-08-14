@@ -4,7 +4,9 @@ import { usePathname } from 'next/navigation';
 import Nav from './Nav';
 import Footer from './Footer';
 
-export default function SiteChrome({ children }: { children: React.ReactNode }) {
+type NavUser = { email: string; username: string | null } | null;
+
+export default function SiteChrome({ children, user }: { children: React.ReactNode; user: NavUser }) {
   const pathname = usePathname();
   const isReader = pathname?.startsWith('/reader/');
 
@@ -15,7 +17,7 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
 
   return (
     <>
-      <Nav />
+      <Nav user={user} />
       {children}
       <Footer />
     </>

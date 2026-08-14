@@ -15,7 +15,9 @@ const links = [
   { label: 'Community', href: '/community' }
 ];
 
-export default function Nav() {
+type NavUser = { email: string; username: string | null } | null;
+
+export default function Nav({ user }: { user: NavUser }) {
   const [dark, setDark] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -24,6 +26,8 @@ export default function Nav() {
     setDark(next);
     document.documentElement.classList.toggle('dark', next);
   }
+
+  const initials = user ? (user.username || user.email).slice(0, 2).toUpperCase() : null;
 
   return (
     <>
@@ -55,7 +59,7 @@ export default function Nav() {
           </ul>
 
           <div className="flex flex-shrink-0 items-center gap-2.5">
-            <CoinBadge className="hidden sm:flex" />
+            {user && <CoinBadge className="hidden sm:flex" />}
             <button
               onClick={toggleDark}
               aria-label="Toggle dark mode"
@@ -70,13 +74,23 @@ export default function Nav() {
             >
               ☰
             </button>
-            <Link
-              href="/profile"
-              aria-label="Your profile"
-              className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-coral to-gold text-sm font-bold text-white shadow-[0_4px_12px_rgba(233,107,107,0.35)] transition-transform hover:scale-105"
-            >
-              YK
-            </Link>
+
+            {user ? (
+              <Link
+                href="/profile"
+                aria-label="Your profile"
+                className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-coral to-gold text-sm font-bold text-white shadow-[0_4px_12px_rgba(233,107,107,0.35)] transition-transform hover:scale-105"
+              >
+                {initials}
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="hidden flex-shrink-0 rounded-full bg-gradient-to-br from-coral to-coral-deep px-5 py-2.5 text-sm font-semibold text-white sm:flex"
+              >
+                Log In
+              </Link>
+            )}
           </div>
         </div>
       </nav>
@@ -95,20 +109,42 @@ export default function Nav() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/profile"
-              onClick={() => setDrawerOpen(false)}
-              className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
-            >
-              Profile
-            </Link>
-            <Link
-              href="/topup"
-              onClick={() => setDrawerOpen(false)}
-              className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
-            >
-              🪙 Top Up
-            </Link>
+
+            {user ? (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setDrawerOpen(false)}
+                  className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/topup"
+                  onClick={() => setDrawerOpen(false)}
+                  className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
+                >
+                  🪙 Top Up
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setDrawerOpen(false)}
+                  className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setDrawerOpen(false)}
+                  className="rounded-xl px-2.5 py-3.5 text-[15.5px] font-semibold hover:bg-blush-soft hover:text-coral-ink dark:hover:bg-white/10"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -26,10 +26,7 @@ export default function ChapterListItem({
     if (unlocked) {
       router.push(href);
     } else {
-      requestUnlock(chapter.number, cost, () => {
-        console.log('[DEBUG] navigating to', href);
-        router.push(href);
-      });
+      requestUnlock(chapter.number, cost, () => router.push(href));
     }
   }
 
