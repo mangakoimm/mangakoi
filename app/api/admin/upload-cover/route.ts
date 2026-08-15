@@ -1,0 +1,46 @@
+import { NextResponse } from 'next/server';
+import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
+
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const slug = formData.get('slug') as string | null;
+    const file = formData.get('file') as File | null;
+
+    if (!slug || !file) {
+      return NextResponse.json({ error: 'Missing manga slug or file.' }, { status: 400 });
+    }
+
+    const supabase = createSupabaseAdminClient();
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${slug}/cover.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('covers')
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    if (uploadError) {
+      // The most common cause here is the bucket not existing yet.
+      return NextResponse.json(
+        { error: `Upload failed: ${uploadError.message}. Have you run "npm run setup-storage"?` },
+        { status: 500 }
+      );
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('covers').getPublicUrl(path);
+    // Cache-bust so the new cover shows immediately instead of a stale cached image.
+    const coverUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+
+    const { error: updateError } = await supabase.from('manga').update({ cover_url: coverUrl }).eq('slug', slug);
+
+    if (updateError) {
+      return NextResponse.json({ error: `Uploaded, but failed to save to manga row: ${updateError.message}` }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: coverUrl });
+  } catch (err: any) {
+    console.error('upload-cover failed:', err);
+    return NextResponse.json({ error: err.message ?? 'Unexpected upload error.' }, { status: 500 });
+  }
+}

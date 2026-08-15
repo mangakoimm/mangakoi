@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const links = [
   { label: 'Dashboard', href: '/admin' },
+  { label: 'Manga & Chapters', href: '/admin/manga' },
   { label: 'Top Up Requests', href: '/admin/requests' },
   { label: 'Users', href: '/admin/users' },
   { label: 'Coin Logs', href: '/admin/coin-logs' }
