@@ -57,8 +57,13 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique,
   avatar_url text,
+  is_admin boolean not null default false,
   created_at timestamptz default now()
 );
+
+-- Safe to re-run even if you already ran an older version of this schema —
+-- adds the column only if it isn't there yet.
+alter table profiles add column if not exists is_admin boolean not null default false;
 
 -- ---------- Bookmarks ----------
 create table if not exists bookmarks (
@@ -138,10 +143,22 @@ alter table pages enable row level security;
 alter table genres enable row level security;
 alter table manga_genres enable row level security;
 
+-- `create policy` has no "if not exists" option, so every policy below is
+-- dropped first — this makes it safe to run this whole file again anytime
+-- (e.g. after pulling schema changes) instead of erroring on the second run.
+drop policy if exists "Public can read manga" on manga;
 create policy "Public can read manga" on manga for select using (true);
+
+drop policy if exists "Public can read chapters" on chapters;
 create policy "Public can read chapters" on chapters for select using (true);
+
+drop policy if exists "Public can read pages" on pages;
 create policy "Public can read pages" on pages for select using (true);
+
+drop policy if exists "Public can read genres" on genres;
 create policy "Public can read genres" on genres for select using (true);
+
+drop policy if exists "Public can read manga_genres" on manga_genres;
 create policy "Public can read manga_genres" on manga_genres for select using (true);
 
 -- Bookmarks / history are private to each signed-in user
@@ -149,12 +166,15 @@ alter table bookmarks enable row level security;
 alter table reading_history enable row level security;
 alter table profiles enable row level security;
 
+drop policy if exists "Users manage their own bookmarks" on bookmarks;
 create policy "Users manage their own bookmarks" on bookmarks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage their own history" on reading_history;
 create policy "Users manage their own history" on reading_history
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage their own profile" on profiles;
 create policy "Users manage their own profile" on profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
 
@@ -166,15 +186,19 @@ alter table coin_transactions enable row level security;
 alter table topup_requests enable row level security;
 alter table unlocked_chapters enable row level security;
 
+drop policy if exists "Users manage their own wallet" on wallets;
 create policy "Users manage their own wallet" on wallets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage their own transactions" on coin_transactions;
 create policy "Users manage their own transactions" on coin_transactions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage their own topup requests" on topup_requests;
 create policy "Users manage their own topup requests" on topup_requests
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users manage their own unlocks" on unlocked_chapters;
 create policy "Users manage their own unlocks" on unlocked_chapters
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -199,3 +223,25 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ---------- Prevent users from granting themselves admin ----------
+-- The "Users manage their own profile" policy above lets a user update any
+-- column on their own row — including is_admin, if nothing stops them. This
+-- trigger silently reverts is_admin back to its previous value unless the
+-- change comes from the service role key (i.e. trusted server-side code),
+-- so the only way to become an admin is for you to set it directly in the
+-- Table Editor (or via a service-role script), never through the app itself.
+create or replace function public.prevent_self_admin_escalation()
+returns trigger as $$
+begin
+  if new.is_admin is distinct from old.is_admin and auth.role() <> 'service_role' then
+    new.is_admin = old.is_admin;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists prevent_self_admin_escalation on profiles;
+create trigger prevent_self_admin_escalation
+  before update on profiles
+  for each row execute function public.prevent_self_admin_escalation();

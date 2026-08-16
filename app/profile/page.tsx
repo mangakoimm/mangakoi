@@ -10,7 +10,7 @@ import { mockManga } from '@/lib/mockData';
 import MangaCard from '@/components/MangaCard';
 import SupabaseNotConfigured from '@/components/SupabaseNotConfigured';
 
-type AuthUser = { email: string; username: string | null } | null;
+type AuthUser = { email: string; username: string | null; isAdmin: boolean } | null;
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,8 +33,12 @@ export default function ProfilePage() {
         router.push('/login');
         return;
       }
-      const { data: profile } = await supabase.from('profiles').select('username').eq('id', authUser.id).single();
-      setUser({ email: authUser.email ?? '', username: profile?.username ?? null });
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, is_admin')
+        .eq('id', authUser.id)
+        .single();
+      setUser({ email: authUser.email ?? '', username: profile?.username ?? null, isAdmin: profile?.is_admin ?? false });
       setChecking(false);
     });
   }, [router, configured]);
@@ -116,7 +120,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-4 ${user.isAdmin ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <Link href="/bookmarks" className="rounded-lg border border-black/10 bg-white p-5 transition-colors hover:border-coral dark:border-white/10 dark:bg-[#1f1a16]">
           <div className="mb-1 font-display text-2xl font-extrabold">{bookmarks.length}</div>
           <div className="text-sm text-ink-soft dark:text-white/50">Bookmarks</div>
@@ -129,10 +133,12 @@ export default function ProfilePage() {
           <div className="mb-1 font-display text-2xl font-extrabold">{unlockedChapters.length}</div>
           <div className="text-sm text-ink-soft dark:text-white/50">Unlocked chapters</div>
         </Link>
-        <Link href="/admin" className="rounded-lg border border-black/10 bg-white p-5 transition-colors hover:border-coral dark:border-white/10 dark:bg-[#1f1a16]">
-          <div className="mb-1 font-display text-2xl font-extrabold">⚙️</div>
-          <div className="text-sm text-ink-soft dark:text-white/50">Admin panel</div>
-        </Link>
+        {user.isAdmin && (
+          <Link href="/admin" className="rounded-lg border border-black/10 bg-white p-5 transition-colors hover:border-coral dark:border-white/10 dark:bg-[#1f1a16]">
+            <div className="mb-1 font-display text-2xl font-extrabold">⚙️</div>
+            <div className="text-sm text-ink-soft dark:text-white/50">Admin panel</div>
+          </Link>
+        )}
       </div>
 
       <h2 className="mb-4 mt-10 font-display text-xl font-bold">Unlocked Chapters</h2>
