@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 
 export async function POST(request: Request) {
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
         .insert(genreIds.map((genre_id: number) => ({ manga_id: manga.id, genre_id })));
       if (genreError) console.error('Failed to link genres:', genreError.message);
     }
+
+    revalidatePath('/');
 
     return NextResponse.json({ manga });
   } catch (err: any) {

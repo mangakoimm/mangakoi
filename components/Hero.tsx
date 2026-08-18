@@ -101,8 +101,13 @@ export default function Hero({ picks }: { picks: MockManga[] }) {
                 className={`absolute animate-floaty overflow-hidden rounded-xl border border-black/[0.06] bg-white shadow-[0_22px_46px_-18px_rgba(34,32,31,0.28)] dark:border-white/10 dark:bg-[#241d19] ${positions[idx % positions.length]}`}
                 style={{ animationDelay: `${idx * 1.1}s` }}
               >
-                <div className={`flex h-[130px] flex-col items-center justify-center gap-1.5 bg-gradient-to-br ${m.cov}`}>
-                  <span className="text-2xl">{m.icon}</span>
+                <div className={`flex h-[130px] flex-col items-center justify-center gap-1.5 overflow-hidden bg-gradient-to-br ${m.cov}`}>
+                  {m.cover_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.cover_url} alt={m.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">{m.icon}</span>
+                  )}
                 </div>
                 <div className="px-2.5 py-2 text-[11.5px] font-bold leading-tight">{m.title}</div>
                 <div className="flex items-center gap-1 px-2.5 pb-2.5 text-[10.5px] font-bold text-gold">★ {m.rating}</div>

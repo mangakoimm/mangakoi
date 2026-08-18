@@ -41,9 +41,21 @@ export default async function MangaPage({ params }: { params: Params }) {
   return (
     <main className="mx-auto max-w-[900px] px-8 py-14">
       <TrackHistory slug={manga.slug} />
-      <h1 className="mb-2 font-display text-3xl font-extrabold">{manga.title}</h1>
-      <p className="mb-1 text-sm font-semibold text-gold">★ {manga.rating}</p>
-      <p className="mb-8 text-ink-soft">{manga.description}</p>
+      <div className="mb-8 flex flex-col gap-6 sm:flex-row">
+        {manga.cover_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={manga.cover_url}
+            alt={manga.title}
+            className="h-[280px] w-[200px] flex-shrink-0 rounded-lg object-cover shadow-lg"
+          />
+        )}
+        <div>
+          <h1 className="mb-2 font-display text-3xl font-extrabold">{manga.title}</h1>
+          <p className="mb-1 text-sm font-semibold text-gold">★ {manga.rating}</p>
+          <p className="text-ink-soft">{manga.description}</p>
+        </div>
+      </div>
 
       <h2 className="mb-4 font-display text-xl font-bold">Chapters</h2>
       <div className="divide-y divide-black/5 rounded-lg border border-black/5 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-[#1f1a16]">

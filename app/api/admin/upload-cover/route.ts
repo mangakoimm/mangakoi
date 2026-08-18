@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 
 export async function POST(request: Request) {
@@ -47,6 +48,13 @@ export async function POST(request: Request) {
     if (updateError) {
       return NextResponse.json({ error: `Failed to save to manga row: ${updateError.message}` }, { status: 500 });
     }
+
+    // Without this, the home page and this manga's detail page would keep
+    // serving their cached version (up to 60s old, or longer in production)
+    // even though the database already has the new cover — which is exactly
+    // why an upload can "succeed" but not visibly show up anywhere.
+    revalidatePath('/');
+    revalidatePath(`/manga/${slug}`);
 
     return NextResponse.json({ url: coverUrl });
   } catch (err: any) {

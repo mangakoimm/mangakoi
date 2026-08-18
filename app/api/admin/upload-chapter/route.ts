@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 
 export async function POST(request: Request) {
@@ -104,6 +105,12 @@ export async function POST(request: Request) {
     if (pagesError) {
       return NextResponse.json({ error: `Images uploaded, but saving page rows failed: ${pagesError.message}` }, { status: 500 });
     }
+
+    // Same reasoning as upload-cover — without this, the freshly uploaded
+    // chapter/pages would be invisible until the cache naturally expires.
+    revalidatePath('/');
+    revalidatePath(`/manga/${slug}`);
+    revalidatePath(`/reader/${slug}/${number}`);
 
     return NextResponse.json({ chapterId: chapter.id, pageCount: pageRows.length });
   } catch (err: any) {

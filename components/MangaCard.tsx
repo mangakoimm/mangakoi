@@ -25,12 +25,21 @@ export default function MangaCard({ manga }: { manga: MockManga }) {
       <Link href={`/manga/${manga.slug}`} className="absolute inset-0 z-[1]" aria-label={`Open ${manga.title}`} />
 
       <div className="relative h-[240px] overflow-hidden">
-        <div className={`pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br p-4 text-center transition-transform duration-500 group-hover:scale-105 ${manga.cov}`}>
-          <span className="text-3xl">{manga.icon}</span>
-          <span className="font-display text-[15px] font-extrabold leading-tight text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.25)]">
-            {manga.title}
-          </span>
-        </div>
+        {manga.cover_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={manga.cover_url}
+            alt={manga.title}
+            className="pointer-events-none h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className={`pointer-events-none flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br p-4 text-center transition-transform duration-500 group-hover:scale-105 ${manga.cov}`}>
+            <span className="text-3xl">{manga.icon}</span>
+            <span className="font-display text-[15px] font-extrabold leading-tight text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.25)]">
+              {manga.title}
+            </span>
+          </div>
+        )}
 
         <div className="pointer-events-none absolute left-2.5 right-2.5 top-2.5 z-[2] flex items-start justify-between">
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-sm ${statusStyle[manga.status]}`}>

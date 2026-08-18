@@ -119,39 +119,50 @@ function CreateMangaForm({ genreList, onCreated }: { genreList: GenreOption[]; o
     setSaving(true);
     setError(null);
 
-    const res = await fetch('/api/admin/create-manga', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        slug,
-        description,
-        author,
-        artist,
-        status,
-        releaseYear,
-        genreIds: selectedGenres
-      })
-    });
-    const data = await res.json();
-    setSaving(false);
+    try {
+      const res = await fetch('/api/admin/create-manga', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          slug,
+          description,
+          author,
+          artist,
+          status,
+          releaseYear,
+          genreIds: selectedGenres
+        })
+      });
 
-    if (!res.ok) {
-      setError(data.error ?? 'Failed to create manga.');
-      return;
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${res.status}). Check the terminal running "npm run dev" for the real error.`);
+      }
+
+      if (!res.ok) {
+        setError(data.error ?? `Failed to create manga (status ${res.status}).`);
+        return;
+      }
+
+      onCreated(`✅ "${title}" created.`);
+      setTitle('');
+      setSlug('');
+      setSlugTouched(false);
+      setDescription('');
+      setAuthor('');
+      setArtist('');
+      setStatus('ongoing');
+      setReleaseYear('');
+      setSelectedGenres([]);
+      setOpen(false);
+    } catch (err: any) {
+      setError(err.message ?? 'Network error — could not reach the server.');
+    } finally {
+      setSaving(false);
     }
-
-    onCreated(`✅ "${title}" created.`);
-    setTitle('');
-    setSlug('');
-    setSlugTouched(false);
-    setDescription('');
-    setAuthor('');
-    setArtist('');
-    setStatus('ongoing');
-    setReleaseYear('');
-    setSelectedGenres([]);
-    setOpen(false);
   }
 
   return (
@@ -293,26 +304,36 @@ function CoverUploadForm({ mangaList, onDone }: { mangaList: MangaOption[]; onDo
     setUploading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('slug', slug);
-    if (mode === 'file') formData.append('file', file!);
-    else formData.append('url', url);
+    try {
+      const formData = new FormData();
+      formData.append('slug', slug);
+      if (mode === 'file') formData.append('file', file!);
+      else formData.append('url', url);
 
-    const res = await fetch('/api/admin/upload-cover', { method: 'POST', body: formData });
-    const data = await res.json();
+      const res = await fetch('/api/admin/upload-cover', { method: 'POST', body: formData });
 
-    setUploading(false);
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${res.status}). Check the terminal running "npm run dev" for the real error.`);
+      }
 
-    if (!res.ok) {
-      setError(data.error ?? 'Upload failed.');
-      return;
+      if (!res.ok) {
+        setError(data.error ?? `Upload failed (status ${res.status}).`);
+        return;
+      }
+
+      onDone('🖼️ Cover saved.');
+      setFile(null);
+      setPreview(null);
+      setUrl('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err: any) {
+      setError(err.message ?? 'Network error — could not reach the server.');
+    } finally {
+      setUploading(false);
     }
-
-    onDone('🖼️ Cover saved.');
-    setFile(null);
-    setPreview(null);
-    setUrl('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   return (
@@ -418,32 +439,42 @@ function ChapterUploadForm({ mangaList, onDone }: { mangaList: MangaOption[]; on
     setError(null);
     setProgress(mode === 'file' ? `Uploading ${files.length} page(s)…` : 'Saving page links…');
 
-    const formData = new FormData();
-    formData.append('slug', slug);
-    formData.append('number', number);
-    formData.append('title', title);
-    formData.append('coinCost', coinCost);
-    if (mode === 'file') files.forEach((f) => formData.append('pages', f));
-    else formData.append('pageUrls', urlList.join('\n'));
+    try {
+      const formData = new FormData();
+      formData.append('slug', slug);
+      formData.append('number', number);
+      formData.append('title', title);
+      formData.append('coinCost', coinCost);
+      if (mode === 'file') files.forEach((f) => formData.append('pages', f));
+      else formData.append('pageUrls', urlList.join('\n'));
 
-    const res = await fetch('/api/admin/upload-chapter', { method: 'POST', body: formData });
-    const data = await res.json();
+      const res = await fetch('/api/admin/upload-chapter', { method: 'POST', body: formData });
 
-    setUploading(false);
-    setProgress(null);
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${res.status}). Check the terminal running "npm run dev" for the real error.`);
+      }
 
-    if (!res.ok) {
-      setError(data.error ?? 'Upload failed.');
-      return;
+      if (!res.ok) {
+        setError(data.error ?? `Upload failed (status ${res.status}).`);
+        return;
+      }
+
+      onDone(`📖 Chapter ${number} saved — ${data.pageCount} page(s).`);
+      setNumber('');
+      setTitle('');
+      setCoinCost('0');
+      setFiles([]);
+      setPageUrls('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err: any) {
+      setError(err.message ?? 'Network error — could not reach the server.');
+    } finally {
+      setUploading(false);
+      setProgress(null);
     }
-
-    onDone(`📖 Chapter ${number} saved — ${data.pageCount} page(s).`);
-    setNumber('');
-    setTitle('');
-    setCoinCost('0');
-    setFiles([]);
-    setPageUrls('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   return (
