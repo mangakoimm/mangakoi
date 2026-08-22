@@ -277,7 +277,7 @@ function CreateMangaForm({ genreList, onCreated }: { genreList: GenreOption[]; o
             {saving ? 'Creating…' : 'Create manga'}
           </button>
 
-          {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}
+          {error && <p className="mt-3 whitespace-pre-line text-sm font-medium text-red-500">{error}</p>}
         </div>
       )}
     </div>
@@ -411,7 +411,7 @@ function CoverUploadForm({ mangaList, onDone }: { mangaList: MangaOption[]; onDo
           {uploading ? 'Saving…' : 'Save'}
         </button>
       </div>
-      {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}
+      {error && <p className="mt-3 whitespace-pre-line text-sm font-medium text-red-500">{error}</p>}
     </div>
   );
 }
@@ -582,7 +582,7 @@ function ChapterUploadForm({ mangaList, onDone }: { mangaList: MangaOption[]; on
         {uploading ? progress ?? 'Saving…' : 'Save chapter'}
       </button>
 
-      {error && <p className="mt-3 text-sm font-medium text-red-500">{error}</p>}
+      {error && <p className="mt-3 whitespace-pre-line text-sm font-medium text-red-500">{error}</p>}
     </div>
   );
 }

@@ -24,12 +24,19 @@ function SectionHead({ emoji, title, subtitle }: { emoji: string; title: string;
 export default async function HomePage() {
   const dbManga = await getMangaList(40);
 
-  // Use real database content once you've added some — until then, show the
-  // demo catalog so the site looks and feels complete out of the box.
   const usingMock = dbManga.length === 0;
   const catalog: MockManga[] = usingMock
     ? mockManga
-    : (dbManga as MockManga[]).map((m) => ({ ...m, cov: 'from-coral to-coral-deep', icon: '📖', chapter: 1 }));
+    : (dbManga as any[]).map((m) => ({
+        ...m,
+        cov: 'from-coral to-coral-deep',
+        icon: '📖',
+        // Was hardcoded to 1 for every real manga regardless of how many
+        // chapters it actually had — that's why "Ch. 1 · updated recently"
+        // never changed after adding new chapters. Now uses the real
+        // highest chapter number computed in getMangaList().
+        chapter: m.latestChapter ?? 0
+      }));
 
   const trending = catalog.slice(0, 12);
   const popular = [...catalog].sort((a, b) => b.rating - a.rating).slice(0, 10);

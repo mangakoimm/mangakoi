@@ -70,32 +70,45 @@ export async function POST(request: Request) {
         pageRows.push({ chapter_id: chapter.id, page_number: i + 1, image_url: url });
       });
     } else {
-      // Upload every page image, in the order they were submitted.
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const ext = file.name.split('.').pop() || 'jpg';
-        const path = `${slug}/${number}/${i + 1}.${ext}`;
+      // Upload every page image in parallel instead of one-at-a-time. This
+      // is faster for large batches, and — more importantly — means one bad
+      // file doesn't just silently kill the whole request with a vague
+      // error; we find out exactly which file(s) failed and why.
+      const results = await Promise.allSettled(
+        files.map(async (file, i) => {
+          const ext = file.name.split('.').pop() || 'jpg';
+          const path = `${slug}/${number}/${i + 1}.${ext}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('chapter-pages')
-          .upload(path, file, { upsert: true, contentType: file.type });
+          const { error: uploadError } = await supabase.storage
+            .from('chapter-pages')
+            .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
 
-        if (uploadError) {
-          return NextResponse.json(
-            {
-              error: `Failed uploading page ${i + 1}: ${uploadError.message}. Have you run "npm run setup-storage"? If you'd rather skip file uploads entirely, paste image URLs instead.`
-            },
-            { status: 500 }
-          );
-        }
+          if (uploadError) {
+            throw new Error(`"${file.name}" (page ${i + 1}): ${uploadError.message}`);
+          }
 
-        const { data: publicUrlData } = supabase.storage.from('chapter-pages').getPublicUrl(path);
-        pageRows.push({
-          chapter_id: chapter.id,
-          page_number: i + 1,
-          image_url: `${publicUrlData.publicUrl}?v=${Date.now()}`
-        });
+          const { data: publicUrlData } = supabase.storage.from('chapter-pages').getPublicUrl(path);
+          return { chapter_id: chapter.id, page_number: i + 1, image_url: `${publicUrlData.publicUrl}?v=${Date.now()}` };
+        })
+      );
+
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      const successes = results.filter((r): r is PromiseFulfilledResult<(typeof pageRows)[number]> => r.status === 'fulfilled');
+
+      if (failures.length > 0) {
+        failures.forEach((f) => console.error('upload-chapter page failed:', f.reason?.message ?? f.reason));
+        return NextResponse.json(
+          {
+            error: `${failures.length} of ${files.length} page(s) failed to upload:\n${failures
+              .map((f) => f.reason?.message ?? String(f.reason))
+              .join('\n')}\n\nHave you run "npm run setup-storage"? Large batches can also hit your hosting provider's request size limit — if that's the case, try fewer files at a time, or paste image URLs instead.`
+          },
+          { status: 500 }
+        );
       }
+
+      successes.forEach((s) => pageRows.push(s.value));
+      pageRows.sort((a, b) => a.page_number - b.page_number);
     }
 
     // Replace any existing pages for this chapter (handles re-uploads cleanly).

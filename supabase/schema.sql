@@ -1,5 +1,6 @@
 -- MangaKoi database schema
--- Run this in the Supabase SQL editor (Project -> SQL Editor -> New query)
+-- Run this in the Supabase SQL editor (Project -> SQL Editor -> New query).
+-- Safe to re-run any time you pull an updated version of this file.
 
 create extension if not exists "pgcrypto";
 
@@ -43,6 +44,10 @@ create table if not exists chapters (
   unique (manga_id, number)
 );
 
+-- Safe to re-run even if you already had a chapters table before coin_cost
+-- was added — this is what actually adds it to an existing table.
+alter table chapters add column if not exists coin_cost int not null default 0;
+
 -- ---------- Pages (the actual images inside a chapter) ----------
 create table if not exists pages (
   id uuid primary key default gen_random_uuid(),
@@ -53,17 +58,30 @@ create table if not exists pages (
 );
 
 -- ---------- Users (extends Supabase auth.users) ----------
+-- `email` is a denormalized copy of auth.users.email, kept in sync by the
+-- handle_new_user trigger below. This exists because auth.users isn't
+-- directly queryable from the client (even for admins) the way a normal
+-- table is — keeping a copy here is what lets /admin/users show real
+-- emails without needing special access to Supabase's internal auth schema.
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique,
+  email text,
   avatar_url text,
   is_admin boolean not null default false,
   created_at timestamptz default now()
 );
 
--- Safe to re-run even if you already ran an older version of this schema —
--- adds the column only if it isn't there yet.
+-- Safe to re-run even if you already had a profiles table before these
+-- columns existed.
 alter table profiles add column if not exists is_admin boolean not null default false;
+alter table profiles add column if not exists email text;
+
+-- Backfill email for any accounts created before this column existed.
+-- Only works if run in the Supabase SQL editor (needs access to auth.users).
+update profiles set email = auth.users.email
+from auth.users
+where profiles.id = auth.users.id and profiles.email is null;
 
 -- ---------- Bookmarks ----------
 create table if not exists bookmarks (
@@ -84,10 +102,6 @@ create table if not exists reading_history (
 );
 
 -- ---------- Manga Coins ----------
--- Wallet balance per user. In the shipped app this is currently simulated
--- client-side with localStorage (lib/coinStore.tsx) since there's no auth
--- wired up yet — these tables are here so a real backend can take over
--- without changing the app's data shape.
 create table if not exists wallets (
   user_id uuid primary key references profiles(id) on delete cascade,
   coin_balance int not null default 0,
@@ -100,7 +114,7 @@ create table if not exists coin_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade,
   type text not null check (type in ('topup', 'unlock')),
-  amount int not null, -- positive for topup, negative for unlock
+  amount int not null,
   description text,
   created_at timestamptz default now()
 );
@@ -114,7 +128,7 @@ create table if not exists topup_requests (
   email text not null,
   transaction_id text,
   notes text,
-  screenshot_url text, -- upload to a "topup-screenshots" storage bucket, store the public URL here
+  screenshot_url text,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   created_at timestamptz default now(),
   reviewed_at timestamptz
@@ -136,16 +150,12 @@ create index if not exists idx_coin_tx_user on coin_transactions(user_id);
 create index if not exists idx_topup_status on topup_requests(status);
 
 -- ---------- Row Level Security ----------
--- Public read access to catalog data; writes restricted to the service role (your admin scripts/API).
 alter table manga enable row level security;
 alter table chapters enable row level security;
 alter table pages enable row level security;
 alter table genres enable row level security;
 alter table manga_genres enable row level security;
 
--- `create policy` has no "if not exists" option, so every policy below is
--- dropped first — this makes it safe to run this whole file again anytime
--- (e.g. after pulling schema changes) instead of erroring on the second run.
 drop policy if exists "Public can read manga" on manga;
 create policy "Public can read manga" on manga for select using (true);
 
@@ -161,7 +171,6 @@ create policy "Public can read genres" on genres for select using (true);
 drop policy if exists "Public can read manga_genres" on manga_genres;
 create policy "Public can read manga_genres" on manga_genres for select using (true);
 
--- Bookmarks / history are private to each signed-in user
 alter table bookmarks enable row level security;
 alter table reading_history enable row level security;
 alter table profiles enable row level security;
@@ -174,13 +183,14 @@ drop policy if exists "Users manage their own history" on reading_history;
 create policy "Users manage their own history" on reading_history
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Regular users can only see/edit their own profile row (so one user can
+-- never read another user's email through the normal client). The real
+-- /admin/users page bypasses this with the service-role key instead of
+-- relying on a policy that exposes everyone's data to everyone.
 drop policy if exists "Users manage their own profile" on profiles;
 create policy "Users manage their own profile" on profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
 
--- Wallets, transactions, top-up requests, and unlocks are private to each
--- signed-in user. Admins approving top-ups should use the service role key
--- (bypasses RLS) from a trusted server context, not the anon client key.
 alter table wallets enable row level security;
 alter table coin_transactions enable row level security;
 alter table topup_requests enable row level security;
@@ -203,14 +213,11 @@ create policy "Users manage their own unlocks" on unlocked_chapters
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ---------- Auto-create a profile (and starter wallet) on signup ----------
--- Whenever someone signs up via Supabase Auth, this automatically creates
--- their row in `profiles` (and a zero-balance wallet), so the app never has
--- to do that as a separate manual step after signUp().
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, username)
-  values (new.id, new.raw_user_meta_data->>'username');
+  insert into public.profiles (id, username, email)
+  values (new.id, new.raw_user_meta_data->>'username', new.email);
 
   insert into public.wallets (user_id, coin_balance, total_purchased, total_spent)
   values (new.id, 0, 0, 0);
@@ -225,12 +232,6 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ---------- Prevent users from granting themselves admin ----------
--- The "Users manage their own profile" policy above lets a user update any
--- column on their own row — including is_admin, if nothing stops them. This
--- trigger silently reverts is_admin back to its previous value unless the
--- change comes from the service role key (i.e. trusted server-side code),
--- so the only way to become an admin is for you to set it directly in the
--- Table Editor (or via a service-role script), never through the app itself.
 create or replace function public.prevent_self_admin_escalation()
 returns trigger as $$
 begin

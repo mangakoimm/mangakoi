@@ -85,7 +85,7 @@ export default function Hero({ picks }: { picks: MockManga[] }) {
           </div>
         </div>
 
-        <div className="relative h-[420px] lg:order-none">
+        <div className="relative hidden h-[420px] lg:block">
           {picks.map((m, idx) => {
             const positions = [
               'top-[2%] left-[6%] w-[150px]',

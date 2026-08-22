@@ -3,9 +3,8 @@ import { getMangaBySlug, getChapters, getChapterPages } from '@/lib/supabase';
 import { mockManga } from '@/lib/mockData';
 import { getChapterCost } from '@/lib/coinRules';
 import ReaderGate from '@/components/ReaderGate';
+import ReaderViewer from '@/components/ReaderViewer';
 
-// `params` is a Promise as of Next.js 15+ but a plain object in Next 14.
-// Awaiting a plain object just resolves to itself, so this works on both.
 type Params = Promise<{ slug: string; chapter: string }> | { slug: string; chapter: string };
 
 export default async function ReaderPage({ params }: { params: Params }) {
@@ -17,7 +16,7 @@ export default async function ReaderPage({ params }: { params: Params }) {
   if (!manga) {
     const mock = mockManga.find((m) => m.slug === slug);
     if (mock) {
-      manga = mock;
+      manga = mock as any;
       isMock = true;
     }
   }
@@ -38,7 +37,6 @@ export default async function ReaderPage({ params }: { params: Params }) {
   const chapter = chapters.find((c) => c.number === chapterNum);
   if (!chapter) notFound();
 
-  // Demo placeholder pages for mock manga (no real images uploaded yet).
   const pages = isMock
     ? Array.from({ length: 10 }, (_, i) => ({
         id: `mock-pg-${i + 1}`,
@@ -63,45 +61,25 @@ export default async function ReaderPage({ params }: { params: Params }) {
         </div>
 
         <ReaderGate mangaSlug={manga.slug} chapterNumber={chapter.number} cost={cost}>
-          <div className="flex flex-col gap-1.5">
-            {isMock
-              ? pages.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex h-[560px] w-full flex-col items-center justify-center gap-2 rounded bg-gradient-to-br from-[#2a2320] to-[#1a1512] font-display font-bold text-white/25"
-                  >
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                    Page {p.page_number}
-                  </div>
-                ))
-              : pages.length === 0
-                ? (
-                    <p className="text-white/60">
-                      No pages uploaded for this chapter yet. Add rows to the <code>pages</code> table with an
-                      <code> image_url</code> pointing at a file in Supabase Storage.
-                    </p>
-                  )
-                : pages.map((p) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={p.id} src={p.image_url} alt={`Page ${p.page_number}`} className="w-full" loading="lazy" />
-                  ))}
-          </div>
+          <ReaderViewer pages={pages} isMock={isMock} />
         </ReaderGate>
 
         <div className="mt-10 flex items-center justify-center gap-4">
           {prevChapter ? (
-            <a href={`/reader/${manga.slug}/${prevChapter.number}`} className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold hover:bg-white/10">
+            <a
+              href={`/reader/${manga.slug}/${prevChapter.number}`}
+              className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold hover:bg-white/10"
+            >
               ← Previous
             </a>
           ) : (
             <span className="rounded-full border border-white/5 px-6 py-3 text-sm font-semibold text-white/30">← Previous</span>
           )}
           {nextChapter ? (
-            <a href={`/reader/${manga.slug}/${nextChapter.number}`} className="rounded-full bg-gradient-to-br from-coral to-coral-deep px-6 py-3 text-sm font-semibold">
+            <a
+              href={`/reader/${manga.slug}/${nextChapter.number}`}
+              className="rounded-full bg-gradient-to-br from-coral to-coral-deep px-6 py-3 text-sm font-semibold"
+            >
               Next chapter →
             </a>
           ) : (

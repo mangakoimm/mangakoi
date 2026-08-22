@@ -1,19 +1,11 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Only create a real client if both env vars are actually set. Without this
-// guard, `createClient(undefined, undefined)` throws at *module load time*
-// (before any function even runs), which crashes every single page the
-// moment you `npm run dev` — even the ones using the mock/demo catalog.
-// This way, the app runs immediately with demo data, and starts talking to
-// your real database the moment .env.local is filled in.
-const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 if (!supabase && typeof window === 'undefined') {
-  // Only log once, server-side, so it doesn't spam the browser console.
   console.warn(
     '[MangaKoi] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are not set — ' +
       'showing the demo catalog. Copy .env.example to .env.local and add your Supabase keys to use real data.'
@@ -33,6 +25,8 @@ export type Manga = {
   rating: number;
   views: number;
   genres?: string[];
+  latestChapter?: number; // highest chapter number that actually exists, from the chapters table
+  chapterCount?: number;
 };
 
 export type Chapter = {
@@ -41,6 +35,7 @@ export type Chapter = {
   number: number;
   title: string | null;
   published_at: string;
+  coin_cost?: number;
 };
 
 export type Page = {
@@ -50,24 +45,30 @@ export type Page = {
   image_url: string;
 };
 
-// Fetch a list of manga with their genre names attached.
-// Returns [] instead of throwing so a missing database (or a hiccup) shows
-// an empty/demo state, never a crashed page.
+// Fetch a list of manga with their genre names attached, plus the real
+// latest-chapter number (was previously hardcoded to 1 everywhere real
+// manga were shown — this is what actually fixes the "Ch. 1 · updated
+// recently" label never changing after you add new chapters).
 export async function getMangaList(limit = 24): Promise<Manga[]> {
   if (!supabase) return [];
   try {
     const { data, error } = await supabase
       .from('manga')
-      .select('*, manga_genres(genres(name))')
+      .select('*, manga_genres(genres(name)), chapters(number)')
       .order('rating', { ascending: false })
       .limit(limit);
 
     if (error) throw error;
 
-    return (data ?? []).map((m: any) => ({
-      ...m,
-      genres: (m.manga_genres ?? []).map((mg: any) => mg.genres?.name).filter(Boolean)
-    }));
+    return (data ?? []).map((m: any) => {
+      const chapterNumbers: number[] = (m.chapters ?? []).map((c: any) => c.number);
+      return {
+        ...m,
+        genres: (m.manga_genres ?? []).map((mg: any) => mg.genres?.name).filter(Boolean),
+        latestChapter: chapterNumbers.length ? Math.max(...chapterNumbers) : 0,
+        chapterCount: chapterNumbers.length
+      };
+    });
   } catch (err) {
     console.error('getMangaList failed:', err);
     return [];
@@ -79,15 +80,18 @@ export async function getMangaBySlug(slug: string): Promise<Manga | null> {
   try {
     const { data, error } = await supabase
       .from('manga')
-      .select('*, manga_genres(genres(name))')
+      .select('*, manga_genres(genres(name)), chapters(number)')
       .eq('slug', slug)
       .single();
 
     if (error) throw error;
 
+    const chapterNumbers: number[] = (data.chapters ?? []).map((c: any) => c.number);
     return {
       ...data,
-      genres: (data.manga_genres ?? []).map((mg: any) => mg.genres?.name).filter(Boolean)
+      genres: (data.manga_genres ?? []).map((mg: any) => mg.genres?.name).filter(Boolean),
+      latestChapter: chapterNumbers.length ? Math.max(...chapterNumbers) : 0,
+      chapterCount: chapterNumbers.length
     };
   } catch (err) {
     console.error('getMangaBySlug failed:', err);
